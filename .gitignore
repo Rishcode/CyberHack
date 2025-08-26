@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+
+# Logs & debug
+*.log
+logs/
+
+# Selenium / Chrome profiles
+chrome_automation_profile/
+{chrome_profile_path}/
+*.crdownload
+
+# Screenshots & generated media
+
+
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache
+.cache/
+pytest_cache/
+
+# Coverage
+htmlcov/
+.coverage*
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
