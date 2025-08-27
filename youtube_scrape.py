@@ -56,6 +56,20 @@ def build_driver():
 def jitter_sleep(base: float = 0.0):
     time.sleep(base + random.uniform(JITTER_MIN, JITTER_MAX))
 
+def prompt_search_terms():
+    """Prompt user for search terms if none provided via environment.
+    Updates global SEARCH_TERMS list in-place.
+    """
+    global SEARCH_TERMS
+    if SEARCH_TERMS:
+        return
+    try:
+        raw = input("Enter YouTube search terms (comma separated): ").strip()
+    except EOFError:
+        raw = ''
+    if raw:
+        SEARCH_TERMS = [t.strip() for t in raw.split(',') if t.strip()]
+
 def video_identity(renderer):
     try:
         link = renderer.find_element(By.CSS_SELECTOR, "a#thumbnail")
@@ -120,8 +134,9 @@ def save_screenshot(driver, renderer, term_slug, idx, vid):
 # ================= Main scraping =================
 
 def scrape():
+    prompt_search_terms()
     if not SEARCH_TERMS:
-        print("[ERROR] Set YT_SEARCH_TERMS environment variable (comma-separated keywords).")
+        print("[ERROR] No search terms provided. Set YT_SEARCH_TERMS env var or input interactively.")
         return
     driver = build_driver()
     try:

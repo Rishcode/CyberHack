@@ -1,3 +1,5 @@
-2025/08/28-01:33:52.263 6864 Reusing MANIFEST C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\Local Storage\leveldb/MANIFEST-000001
-2025/08/28-01:33:52.267 6864 Recovering log #9
-2025/08/28-01:33:52.270 6864 Reusing old log C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\Local Storage\leveldb/000009.log 
+2025/08/28-01:48:12.652 58f8 Reusing MANIFEST C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/08/28-01:48:12.657 58f8 Recovering log #12
+2025/08/28-01:48:12.658 58f8 Level-0 table #16: started
+2025/08/28-01:48:12.662 58f8 Level-0 table #16: 17805 bytes OK
+2025/08/28-01:48:12.666 58f8 Delete type=0 #12
