@@ -166,7 +166,7 @@ def center_and_capture(video_el, idx):
         const el = arguments[0];
         el.scrollIntoView({behavior:'auto', block:'center', inline:'center'});
     """, video_el)
-    time.sleep(1.2)
+    time.sleep(2.5)
     rid = reel_identity(video_el)
     fname = os.path.join(out_dir, f"reel_{idx:03d}_{rid[:8]}.png")
     # Element-level screenshot (preferred). Fallback to full page if fails.
@@ -208,7 +208,7 @@ while saved < target:
 
     # Scroll down
     driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
-    time.sleep(2.2)
+    time.sleep(3.5)
 
     # If feed stuck >60s without new reel break
     if time.time() - last_new_time > 60:

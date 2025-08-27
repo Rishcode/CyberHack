@@ -20,7 +20,8 @@ ENV_PASS = "TWITTER_PASSWORD"
 BASE_URL = "https://x.com/"  # formerly twitter.com
 TIMELINE_URL = os.environ.get("TW_TIMELINE_URL", "https://x.com/home")
 TRENDING_URL = os.environ.get("TW_TRENDING_URL", "https://x.com/explore/tabs/trending")
-MODE = os.environ.get("TW_MODE", "TIMELINE").upper()  # TIMELINE or TRENDING
+MODE = os.environ.get("TW_MODE", "TIMELINE").upper()  # TIMELINE | TRENDING | SEARCH
+SEARCH_TERMS = [t.strip() for t in os.environ.get("TW_SEARCH_TERMS", "").split(',') if t.strip()]
 
 os.makedirs(OUT_DIR, exist_ok=True)
 meta_path = os.path.join(OUT_DIR, "metadata.jsonl")
@@ -248,6 +249,83 @@ def scrape_posts():
                     time.sleep(SCROLL_PAUSE + random.uniform(JITTER_MIN, JITTER_MAX))
                     scroll_rounds += 1
                 print(f"[DONE] Collected {collected} trending topics.")
+        elif MODE == "SEARCH":
+            if not SEARCH_TERMS:
+                print("[ERROR] SEARCH mode requires TW_SEARCH_TERMS env var (comma-separated keywords).")
+                return
+            wait = WebDriverWait(driver, 30)
+            with open(meta_path, 'a', encoding='utf-8') as meta_file:
+                for term in SEARCH_TERMS:
+                    encoded = term.replace('#','%23').replace(' ','%20')
+                    # Using 'live' filter for latest; remove &f=live for Top
+                    search_url = f"https://x.com/search?q={encoded}&src=typed_query&f=live"
+                    print(f"[TERM] Searching: {term} -> {search_url}")
+                    driver.get(search_url)
+                    try:
+                        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
+                    except TimeoutException:
+                        print(f"[WARN] Primary column not found for term {term}")
+                    collected = 0
+                    seen = set()
+                    stagnant = 0
+                    last_height = 0
+                    term_slug = ''.join(ch for ch in term if ch.isalnum() or ch in ('_','#')).strip('#') or 'term'
+                    target_per_term = TARGET_COUNT  # reuse global target; user can adjust env per run
+                    while collected < target_per_term and stagnant < 12:
+                        cards = driver.find_elements(By.XPATH, "//article[@data-testid='tweet']")
+                        new_in_cycle = 0
+                        for c in cards:
+                            pid = post_identity(c)
+                            if pid in seen:
+                                continue
+                            # crude filter: ensure term (case-insensitive) appears in text (or hashtag form) before saving
+                            text_lower = ''
+                            try:
+                                text_parts = c.find_elements(By.XPATH, ".//div[@data-testid='tweetText']//span")
+                                text_lower = ' '.join(t.text for t in text_parts).lower()
+                            except Exception:
+                                pass
+                            search_variants = {term.lower()}
+                            if term.startswith('#'):
+                                search_variants.add(term.lower().lstrip('#'))
+                            if not any(v in text_lower for v in search_variants):
+                                # skip if term not present; remove this block to capture all results page tweets
+                                continue
+                            seen.add(pid)
+                            info = extract_post(c)
+                            info['id'] = pid
+                            info['index'] = collected
+                            info['search_term'] = term
+                            info['mode'] = 'SEARCH'
+                            info['captured_at'] = datetime.utcnow().isoformat()
+                            shot_path = os.path.join(OUT_DIR, f"search_{term_slug}_{collected:03d}_{pid[:8]}.png")
+                            try:
+                                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", c)
+                                time.sleep(random.uniform(0.4, 0.9))
+                                c.screenshot(shot_path)
+                            except Exception:
+                                driver.save_screenshot(shot_path)
+                            info['screenshot'] = shot_path
+                            meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
+                            meta_file.flush()
+                            collected += 1
+                            new_in_cycle += 1
+                            print(f"[SEARCH:{term}] {collected}/{target_per_term} -> {shot_path}")
+                            if collected >= target_per_term:
+                                break
+                        if collected >= target_per_term:
+                            break
+                        driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
+                        time.sleep(SCROLL_PAUSE + random.uniform(JITTER_MIN, JITTER_MAX))
+                        new_height = driver.execute_script('return document.body.scrollHeight')
+                        if new_in_cycle == 0:
+                            stagnant += 1
+                        else:
+                            stagnant = 0
+                        if new_height == last_height:
+                            stagnant += 1
+                        last_height = new_height
+                    print(f"[DONE] Term '{term}' collected {collected} tweets.")
         else:
             # TIMELINE mode (default)
             driver.get(TIMELINE_URL)
@@ -299,7 +377,10 @@ def scrape_posts():
                     last_height = new_height
                 print(f"[DONE] Collected {collected} posts.")
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except Exception:
+            pass
 
 if __name__ == '__main__':
     scrape_posts()
