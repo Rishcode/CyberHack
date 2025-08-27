@@ -1,29 +1,29 @@
-[5452:30240:0826/172223.129:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:202] No machine level policy manager exists.
-[30688:24360:0826/172223.234:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[40384:14896:0826/172223.234:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[5300:26888:0826/172223.386:VERBOSE1:components\viz\service\main\viz_main_impl.cc:86] VizNullHypothesis is disabled (not a warning)
-[13416:24596:0826/172223.551:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[31560:24332:0826/172223.597:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[33696:6812:0826/172224.062:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[2964:35924:0826/172224.762:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[5452:30240:0826/172226.777:INFO:CONSOLE:250] "
+[18032:33008:0827/224241.288:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:202] No machine level policy manager exists.
+[8516:8884:0827/224241.461:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[39096:31764:0827/224241.474:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[7892:11000:0827/224241.666:VERBOSE1:components\viz\service\main\viz_main_impl.cc:86] VizNullHypothesis is disabled (not a warning)
+[7004:9912:0827/224241.833:WARNING:net\disk_cache\blockfile\backend_impl.cc:1789] Destroying invalid entry.
+[7004:9912:0827/224241.918:WARNING:net\disk_cache\blockfile\backend_impl.cc:1789] Destroying invalid entry.
+[35536:39108:0827/224241.971:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[7004:9912:0827/224241.996:WARNING:net\disk_cache\blockfile\backend_impl.cc:1789] Destroying invalid entry.
+[7004:9912:0827/224242.019:WARNING:net\disk_cache\blockfile\backend_impl.cc:1789] Destroying invalid entry.
+[14620:39144:0827/224242.048:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[31864:3868:0827/224242.596:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[1496:10576:0827/224243.530:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[18032:33008:0827/224246.401:INFO:CONSOLE:250] "
 %cStop! font-family:helvetica; font-size:20px; font-size:50px; font-weight:bold; color:red; -webkit-text-stroke:1px black;", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[5452:30240:0826/172226.777:INFO:CONSOLE:250] "
+[18032:33008:0827/224246.401:INFO:CONSOLE:250] "
 %cThis is a browser feature intended for developers. If someone told you to copy-paste something here to enable an Instagram feature or "hack" someone's account, it is a scam and will give them access to your Instagram account. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[5452:30240:0826/172226.777:INFO:CONSOLE:250] "
+[18032:33008:0827/224246.401:INFO:CONSOLE:250] "
 %cSee https://www.facebook.com/selfxss for more information. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[5452:30240:0826/172226.777:INFO:CONSOLE:250] "
+[18032:33008:0827/224246.401:INFO:CONSOLE:250] "
 %c ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[5452:30240:0826/172227.317:INFO:CONSOLE:0] "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.", source: https://www.instagram.com/reels/DNnuT4CplNF/ (0)
-[5452:30240:0826/172228.961:INFO:CONSOLE:89] "ErrorUtils caught an error:
+[18032:33008:0827/224247.194:INFO:CONSOLE:0] "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.", source: https://www.instagram.com/reels/DNUgaWTqBVY/ (0)
+[40304:6604:0827/224249.839:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[18032:33008:0827/224250.291:INFO:CONSOLE:89] "ErrorUtils caught an error:
 
-DTSG response is not valid: {"__ar":1,"error":1357004,"errorSummary":"Sorry, something went wrong","errorDescription":"Please try closing and re-opening your browser window.","isNotCritical":1,"rid":"AVae_s1xq6WrEMSAe1F5_rj","payload":null,"lid":"7542860856240479607"}'
+DTSG response is not valid: {"__ar":1,"error":1357004,"errorSummary":"Sorry, something went wrong","errorDescription":"Please try closing and re-opening your browser window.","isNotCritical":1,"rid":"AeN0doc9reBU3Q74Hn6UET8","payload":null,"lid":"7543314494742348809"}'
 
-Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [object Object]", source: https://static.cdninstagram.com/rsrc.php/v4/yG/r/8bu7OzQOgq8.js (89)
-[31708:35792:0826/172229.940:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[12032:21052:0826/172230.299:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[5452:30240:0826/172230.320:INFO:CONSOLE:246] "Permissions policy violation: unload is not allowed in this document.", source: https://static.xx.fbcdn.net/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (246)
-[5452:16912:0826/172231.093:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
-[5452:16912:0826/172256.063:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
-[38664:8572:0826/172256.119:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
-[38664:8572:0826/172256.119:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [object Object]", source: https://static.cdninstagram.com/rsrc.php/v4/y1/r/D88R3aU5mSQ.js (89)
+[35144:5032:0827/224250.296:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[18032:33008:0827/224250.316:INFO:CONSOLE:246] "Permissions policy violation: unload is not allowed in this document.", source: https://static.xx.fbcdn.net/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (246)
