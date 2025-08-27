@@ -71,7 +71,7 @@ def login(driver):
         return
     driver.get("https://x.com/login")
     time.sleep(random.uniform(JITTER_MIN, JITTER_MAX))
-    wait = WebDriverWait(driver, 30)
+    wait = WebDriverWait(driver, 10)
     # Step 1: Username / email / phone
     try:
         user_in = wait.until(EC.visibility_of_element_located((By.NAME, "text")))
@@ -111,7 +111,7 @@ def login(driver):
 
     # Step 3: Password
     try:
-        pwd_in = WebDriverWait(driver, 25).until(EC.visibility_of_element_located((By.NAME, "password")))
+        pwd_in = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "password")))
         pwd_in.clear()
         pwd_in.send_keys(_env(ENV_PASS))
         time.sleep(random.uniform(0.25, 0.6))
@@ -129,7 +129,7 @@ def login(driver):
         print(f"[WARN] Could not enter password: {e}")
     # Wait for primary column
     try:
-        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
         print("[INFO] Login success (primary column detected).")
     except TimeoutException:
         print("[WARN] Could not confirm login.")
@@ -256,7 +256,8 @@ def scrape_posts():
             wait = WebDriverWait(driver, 30)
             with open(meta_path, 'a', encoding='utf-8') as meta_file:
                 for term in SEARCH_TERMS:
-                    encoded = term.replace('#','%23').replace(' ','%20')
+                    from urllib.parse import quote
+                    encoded = quote(term)
                     # Using 'live' filter for latest; remove &f=live for Top
                     search_url = f"https://x.com/search?q={encoded}&src=typed_query&f=live"
                     print(f"[TERM] Searching: {term} -> {search_url}")

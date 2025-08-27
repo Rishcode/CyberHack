@@ -1,4 +1,7 @@
 # Python
+chrome_automation_profile/
+chrome_automation_profile/ShaderCache
+
 __pycache__/
 *.py[cod]
 *$py.class
@@ -18,7 +21,7 @@ ENV/
 logs/
 
 # Selenium / Chrome profiles
-chrome_automation_profile/
+
 {chrome_profile_path}/
 *.crdownload
 
@@ -50,3 +53,4 @@ dist/
 chrome_automation_profile/
 reels_screenshots/
 test.png
+twitter_posts/

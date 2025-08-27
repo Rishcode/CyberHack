@@ -152,7 +152,7 @@ def scrape():
                                 continue
                             if 'live' in href and 'v=' not in href:
                                 # skip non-standard live placeholder
-                                pass
+                                continue
                         except Exception:
                             pass
                         vid = video_identity(r)
