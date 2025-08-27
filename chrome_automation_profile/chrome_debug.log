@@ -1,67 +1,55 @@
-[35016:1536:0828/010137.984:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:202] No machine level policy manager exists.
-[22472:40972:0828/010138.093:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[8424:17972:0828/010138.093:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[20768:37692:0828/010138.265:VERBOSE1:components\viz\service\main\viz_main_impl.cc:86] VizNullHypothesis is disabled (not a warning)
-[5812:8372:0828/010138.482:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[15328:10736:0828/010138.530:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[15264:5220:0828/010139.040:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[11848:8364:0828/010140.125:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[35016:1536:0828/010142.043:INFO:CONSOLE:250] "
+[38164:12888:0828/013546.668:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:202] No machine level policy manager exists.
+[24900:6336:0828/013546.776:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[20612:26408:0828/013546.777:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[5032:13192:0828/013546.962:VERBOSE1:components\viz\service\main\viz_main_impl.cc:86] VizNullHypothesis is disabled (not a warning)
+[29264:20060:0828/013547.164:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[38164:14048:0828/013550.073:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[10164:10580:0828/013606.551:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[27056:18344:0828/013607.272:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[38164:12888:0828/013607.657:INFO:CONSOLE:250] "
 %cStop! font-family:helvetica; font-size:20px; font-size:50px; font-weight:bold; color:red; -webkit-text-stroke:1px black;", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010142.043:INFO:CONSOLE:250] "
+[38164:12888:0828/013607.657:INFO:CONSOLE:250] "
 %cThis is a browser feature intended for developers. If someone told you to copy-paste something here to enable an Instagram feature or "hack" someone's account, it is a scam and will give them access to your Instagram account. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010142.043:INFO:CONSOLE:250] "
+[38164:12888:0828/013607.657:INFO:CONSOLE:250] "
 %cSee https://www.facebook.com/selfxss for more information. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010142.043:INFO:CONSOLE:250] "
+[38164:12888:0828/013607.657:INFO:CONSOLE:250] "
 %c ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010142.558:INFO:CONSOLE:0] "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.", source: https://www.instagram.com/reels/DM4Sg1P0NnS/ (0)
-[35016:1536:0828/010144.237:INFO:CONSOLE:89] "ErrorUtils caught an error:
+[14960:7220:0828/013607.877:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[38164:12888:0828/013608.072:INFO:CONSOLE:0] "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.", source: https://www.instagram.com/explore/search/keyword/?q=%23scam (0)
+[38164:12888:0828/013609.031:INFO:CONSOLE:250] "
+%cStop! font-family:helvetica; font-size:20px; font-size:50px; font-weight:bold; color:red; -webkit-text-stroke:1px black;", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
+[38164:12888:0828/013609.031:INFO:CONSOLE:250] "
+%cThis is a browser feature intended for developers. If someone told you to copy-paste something here to enable an Instagram feature or "hack" someone's account, it is a scam and will give them access to your Instagram account. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
+[38164:12888:0828/013609.031:INFO:CONSOLE:250] "
+%cSee https://www.facebook.com/selfxss for more information. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
+[38164:12888:0828/013609.031:INFO:CONSOLE:250] "
+%c ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
+[38164:12888:0828/013609.398:INFO:CONSOLE:0] "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.", source: https://www.instagram.com/explore/search/keyword/?q=%23scam (0)
+[38164:12888:0828/013611.842:INFO:CONSOLE:89] "ErrorUtils caught an error:
 
-DTSG response is not valid: {"__ar":1,"error":1357004,"errorSummary":"Sorry, something went wrong","errorDescription":"Please try closing and re-opening your browser window.","isNotCritical":1,"rid":"A6rkXSFwmxFft5bBTObQv4H","payload":null,"lid":"7543350290017801559"}'
+DTSG response is not valid: {"__ar":1,"error":1357004,"errorSummary":"Sorry, something went wrong","errorDescription":"Please try closing and re-opening your browser window.","isNotCritical":1,"rid":"A-ALQZ5FcbQ-AJi08eOR1Ka","payload":null,"lid":"7543359167365022024"}'
 
 Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [object Object]", source: https://static.cdninstagram.com/rsrc.php/v4/y1/r/D88R3aU5mSQ.js (89)
-[29500:37248:0828/010145.194:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[22980:21624:0828/010145.551:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[35016:1536:0828/010145.573:INFO:CONSOLE:246] "Permissions policy violation: unload is not allowed in this document.", source: https://static.xx.fbcdn.net/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (246)
-[6552:33528:0828/010146.370:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[40940:26268:0828/010146.667:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[29488:11372:0828/010147.832:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[35016:1536:0828/010150.879:INFO:CONSOLE:250] "
+[41892:41512:0828/013612.192:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[27472:19200:0828/013612.571:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[38164:12888:0828/013612.590:INFO:CONSOLE:246] "Permissions policy violation: unload is not allowed in this document.", source: https://static.xx.fbcdn.net/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (246)
+[38164:14048:0828/013619.076:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[38164:14048:0828/013709.151:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[38164:12888:0828/013714.539:INFO:CONSOLE:250] "
 %cStop! font-family:helvetica; font-size:20px; font-size:50px; font-weight:bold; color:red; -webkit-text-stroke:1px black;", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010150.879:INFO:CONSOLE:250] "
+[38164:12888:0828/013714.541:INFO:CONSOLE:250] "
 %cThis is a browser feature intended for developers. If someone told you to copy-paste something here to enable an Instagram feature or "hack" someone's account, it is a scam and will give them access to your Instagram account. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010150.879:INFO:CONSOLE:250] "
+[38164:12888:0828/013714.541:INFO:CONSOLE:250] "
 %cSee https://www.facebook.com/selfxss for more information. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010150.879:INFO:CONSOLE:250] "
+[38164:12888:0828/013714.541:INFO:CONSOLE:250] "
 %c ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010151.590:INFO:CONSOLE:0] "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.", source: https://www.instagram.com/reels/DN0RlFc5pIE/ (0)
-[11156:36808:0828/010154.029:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[35016:1536:0828/010154.460:INFO:CONSOLE:246] "Permissions policy violation: unload is not allowed in this document.", source: https://static.xx.fbcdn.net/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (246)
-[35016:1536:0828/010154.689:INFO:CONSOLE:89] "ErrorUtils caught an error:
+[38164:12888:0828/013714.863:INFO:CONSOLE:0] "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.", source: https://www.instagram.com/reels/DMsSNtSM9SP/ (0)
+[38164:12888:0828/013716.672:INFO:CONSOLE:89] "ErrorUtils caught an error:
 
-DTSG response is not valid: {"__ar":1,"error":1357004,"errorSummary":"Sorry, something went wrong","errorDescription":"Please try closing and re-opening your browser window.","isNotCritical":1,"rid":"AjjSZd1ZmcfhPy3C1eOdRQB","payload":null,"lid":"7543350332466145785"}'
+DTSG response is not valid: {"__ar":1,"error":1357004,"errorSummary":"Sorry, something went wrong","errorDescription":"Please try closing and re-opening your browser window.","isNotCritical":1,"rid":"ART4cztes_Qin2WzQqTfdTx","payload":null,"lid":"7543359445728887451"}'
 
 Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [object Object]", source: https://static.cdninstagram.com/rsrc.php/v4/y1/r/D88R3aU5mSQ.js (89)
-[35016:1536:0828/010204.083:INFO:CONSOLE:250] "
-%cStop! font-family:helvetica; font-size:20px; font-size:50px; font-weight:bold; color:red; -webkit-text-stroke:1px black;", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010204.083:INFO:CONSOLE:250] "
-%cThis is a browser feature intended for developers. If someone told you to copy-paste something here to enable an Instagram feature or "hack" someone's account, it is a scam and will give them access to your Instagram account. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010204.083:INFO:CONSOLE:250] "
-%cSee https://www.facebook.com/selfxss for more information. font-family:helvetica; font-size:20px; ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010204.083:INFO:CONSOLE:250] "
-%c ", source: https://static.cdninstagram.com/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (250)
-[35016:1536:0828/010206.476:INFO:CONSOLE:89] "ErrorUtils caught an error:
-
-DTSG response is not valid: {"__ar":1,"error":1357004,"errorSummary":"Sorry, something went wrong","errorDescription":"Please try closing and re-opening your browser window.","isNotCritical":1,"rid":"AzNwDmUP3yBdvamLmNrYi2R","payload":null,"lid":"7543350384342685046"}'
-
-Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [object Object]", source: https://static.cdninstagram.com/rsrc.php/v4/y1/r/D88R3aU5mSQ.js (89)
-[19252:17676:0828/010207.386:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
-[35016:16528:0828/010208.041:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
-[20768:32676:0828/010212.835:WARNING:ui\gl\angle_platform_impl.cc:52] HLSLCompiler.cpp:250 (rx::HLSLCompiler::compileToBinary): 
-C:\fakepath(137,3-70): warning X3557: loop only executes for 1 iteration(s), forcing loop to unroll
-
-[20768:32676:0828/010215.874:WARNING:ui\gl\angle_platform_impl.cc:52] HLSLCompiler.cpp:250 (rx::HLSLCompiler::compileToBinary): 
-C:\fakepath(130,3-70): warning X3557: loop only executes for 1 iteration(s), forcing loop to unroll
-
-[12172:32348:0828/010221.484:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
-[12172:32348:0828/010221.484:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[14284:13380:0828/013717.811:INFO:third_party\webrtc\rtc_base\cpu_info.cc:88] Available number of cores: 16
+[38164:12888:0828/013718.274:INFO:CONSOLE:246] "Permissions policy violation: unload is not allowed in this document.", source: https://static.xx.fbcdn.net/rsrc.php/v4/yr/r/EFIwJt2mEh6.js (246)
+[36696:5464:0828/013720.800:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[36696:5464:0828/013720.800:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.

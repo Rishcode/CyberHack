@@ -1,3 +1,14 @@
-2025/08/28-01:20:47.075 5424 Reusing MANIFEST C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\Local Storage\leveldb/MANIFEST-000001
-2025/08/28-01:20:47.079 5424 Recovering log #9
-2025/08/28-01:20:47.081 5424 Reusing old log C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\Local Storage\leveldb/000009.log 
+2025/08/28-01:35:46.728 2ef8 Reusing MANIFEST C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/08/28-01:35:46.732 2ef8 Recovering log #9
+2025/08/28-01:35:46.735 2ef8 Reusing old log C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\Local Storage\leveldb/000009.log 
+2025/08/28-01:36:17.589 8fd4 Level-0 table #13: started
+2025/08/28-01:36:17.593 8fd4 Level-0 table #13: 18262 bytes OK
+2025/08/28-01:36:17.595 8fd4 Delete type=0 #9
+2025/08/28-01:36:17.595 8fd4 Compacting 4@0 + 0@1 files
+2025/08/28-01:36:17.599 8fd4 Generated table #14@0: 43 keys, 6748 bytes
+2025/08/28-01:36:17.599 8fd4 Compacted 4@0 + 0@1 files => 6748 bytes
+2025/08/28-01:36:17.599 8fd4 compacted to: files[ 0 1 0 0 0 0 0 ]
+2025/08/28-01:36:17.600 8fd4 Delete type=2 #3
+2025/08/28-01:36:17.600 8fd4 Delete type=2 #6
+2025/08/28-01:36:17.600 8fd4 Delete type=2 #10
+2025/08/28-01:36:17.600 8fd4 Delete type=2 #13

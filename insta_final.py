@@ -27,8 +27,33 @@ try:
 except Exception:
     pass
 
-print("[STEP] Opening Instagram Reels page...")
-driver.get("https://www.instagram.com/reels/")
+INTERACTIVE = os.environ.get("INSTA_INTERACTIVE", "1").lower() in {"1","true","yes"}
+RAW_FILTER = os.environ.get("INSTA_FILTER_TERMS", "").strip()
+FILTER_TERMS = [t.lower().strip() for t in RAW_FILTER.split(',') if t.strip()]
+HASHTAG = os.environ.get("INSTA_HASHTAG", "").lstrip('#').strip()
+
+def prompt_filter_terms():
+    global FILTER_TERMS, HASHTAG
+    if not FILTER_TERMS and INTERACTIVE:
+        try:
+            ans = input("Enter comma-separated keyword filters for reels (blank = all): ").strip()
+            if ans:
+                FILTER_TERMS = [a.lower().strip() for a in ans.split(',') if a.strip()]
+        except EOFError:
+            pass
+    if not HASHTAG and INTERACTIVE:
+        try:
+            h = input("Enter a hashtag to open (without #, blank = generic Reels): ").strip().lstrip('#')
+            if h:
+                HASHTAG = h
+        except EOFError:
+            pass
+
+prompt_filter_terms()
+
+start_url = f"https://www.instagram.com/explore/tags/{HASHTAG}/" if HASHTAG else "https://www.instagram.com/reels/"
+print(f"[STEP] Opening Instagram {'hashtag #' + HASHTAG if HASHTAG else 'Reels'} page...")
+driver.get(start_url)
 WAIT = WebDriverWait(driver, 25)
 
 ENV_USER = "INSTA_USERNAME"
@@ -99,7 +124,7 @@ def perform_login():
     while time.time() - start < 60:
         if has_session_cookie() and not on_login_page():
             print("[INFO] Login success.")
-            driver.get("https://www.instagram.com/reels/")
+            driver.get(start_url)
             time.sleep(3)
             return True
         if any(k in driver.current_url.lower() for k in ["challenge","two_factor","verification"]):
@@ -120,7 +145,7 @@ def ensure_logged_in():
             start = time.time()
             while time.time() - start < 120:
                 if has_session_cookie() and not on_login_page():
-                    driver.get("https://www.instagram.com/reels/")
+                    driver.get(start_url)
                     time.sleep(3)
                     print("[INFO] Manual login detected.")
                     return
@@ -128,7 +153,7 @@ def ensure_logged_in():
             print("[ERROR] Manual login not completed.")
             driver.quit(); sys.exit(1)
     else:
-        driver.get("https://www.instagram.com/reels/")
+        driver.get(start_url)
         time.sleep(3)
         if on_login_page():
             ensure_logged_in()
@@ -143,6 +168,10 @@ target = int(os.environ.get("REEL_TARGET", "50"))
 out_dir = "reels_screenshots"
 os.makedirs(out_dir, exist_ok=True)
 print(f"[INFO] Saving up to {target} reel screenshots in {out_dir}")
+if FILTER_TERMS:
+    print(f"[INFO] Filtering reels containing any of: {FILTER_TERMS}")
+if HASHTAG:
+    print(f"[INFO] Hashtag mode active: #{HASHTAG}")
 
 seen_ids = set()
 saved = 0
@@ -176,7 +205,76 @@ def center_and_capture(video_el, idx):
         driver.save_screenshot(fname)
     print(f"[CAPTURE] {fname}")
 
-print("[STEP] Starting scroll & capture loop...")
+def capture_hashtag_posts():
+    hash_target = int(os.environ.get("INSTA_HASHTAG_TARGET", str(target)))
+    print(f"[STEP] Capturing up to {hash_target} posts for #{HASHTAG} before reels...")
+    seen_posts = set()
+    collected = 0
+    stagnant = 0
+    max_stagnant = 10
+    last_height = 0
+    while collected < hash_target and stagnant < max_stagnant:
+        # Hashtag pages often have anchors linking to /p/ or /reel/
+        anchors = driver.find_elements(By.XPATH, "//a[contains(@href,'/p/') or contains(@href,'/reel/')]")
+        new_in_cycle = 0
+        for a in anchors:
+            try:
+                href = a.get_attribute('href') or ''
+                if not href or href in seen_posts:
+                    continue
+                seen_posts.add(href)
+                # Filter terms if provided (checking aria-label/text of parent)
+                if FILTER_TERMS:
+                    context_txt = ''
+                    try:
+                        context_txt = a.get_attribute('aria-label') or ''
+                    except Exception:
+                        pass
+                    if context_txt:
+                        ctx_low = context_txt.lower()
+                        if not any(ft in ctx_low for ft in FILTER_TERMS):
+                            continue
+                pid = hashlib.sha1(href.encode()).hexdigest()
+                fname = os.path.join(out_dir, f"hashtag_{collected:03d}_{pid[:8]}.png")
+                try:
+                    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", a)
+                    time.sleep(1.0)
+                    a.screenshot(fname)
+                except Exception:
+                    driver.save_screenshot(fname)
+                print(f"[HASHPOST] {collected+1}/{hash_target} -> {fname}")
+                collected += 1
+                new_in_cycle += 1
+                if collected >= hash_target:
+                    break
+            except Exception:
+                continue
+        if collected >= hash_target:
+            break
+        # Scroll grid page
+        driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
+        time.sleep(1.8)
+        new_height = driver.execute_script('return document.body.scrollHeight')
+        if new_in_cycle == 0:
+            stagnant += 1
+        else:
+            stagnant = 0
+        if new_height == last_height:
+            stagnant += 1
+        last_height = new_height
+    print(f"[DONE] Hashtag posts captured: {collected}")
+
+# If hashtag provided, capture posts first then switch to reels feed for video collection
+if HASHTAG:
+    capture_hashtag_posts()
+    print("[STEP] Switching to Reels feed after hashtag posts...")
+    try:
+        driver.get("https://www.instagram.com/reels/")
+        time.sleep(3)
+    except Exception:
+        pass
+
+print("[STEP] Starting scroll & capture loop for reels...")
 
 while saved < target:
     # Collect candidate video elements
@@ -188,6 +286,16 @@ while saved < target:
             if rid in seen_ids:
                 continue
             seen_ids.add(rid)
+            if FILTER_TERMS:
+                context_txt = ""
+                try:
+                    # Try parent containers for text/captions
+                    parent = v.find_element(By.XPATH, "ancestor::div[1]")  # keep minimal; adjust if needed
+                    context_txt = parent.text.lower()
+                except Exception:
+                    pass
+                if context_txt and not any(ft in context_txt for ft in FILTER_TERMS):
+                    continue
             center_and_capture(v, saved)
             saved += 1
             new_in_cycle += 1

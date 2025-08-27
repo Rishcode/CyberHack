@@ -22,6 +22,9 @@ TIMELINE_URL = os.environ.get("TW_TIMELINE_URL", "https://x.com/home")
 TRENDING_URL = os.environ.get("TW_TRENDING_URL", "https://x.com/explore/tabs/trending")
 MODE = os.environ.get("TW_MODE", "TIMELINE").upper()  # TIMELINE | TRENDING | SEARCH
 SEARCH_TERMS = [t.strip() for t in os.environ.get("TW_SEARCH_TERMS", "").split(',') if t.strip()]
+FILTER_TERMS_ENV = os.environ.get("TW_FILTER_TERMS", "").strip()
+FILTER_TERMS = [t.lower().strip() for t in FILTER_TERMS_ENV.split(',') if t.strip()]
+INTERACTIVE = os.environ.get("TW_INTERACTIVE", "1").lower() in {"1","true","yes"}
 
 os.makedirs(OUT_DIR, exist_ok=True)
 meta_path = os.path.join(OUT_DIR, "metadata.jsonl")
@@ -292,6 +295,10 @@ def scrape_posts():
                             if not any(v in text_lower for v in search_variants):
                                 # skip if term not present; remove this block to capture all results page tweets
                                 continue
+                            # Optional filtering by FILTER_TERMS list (AND logic on presence of any term)
+                            if FILTER_TERMS:
+                                if not any(ft in text_lower for ft in FILTER_TERMS):
+                                    continue
                             seen.add(pid)
                             info = extract_post(c)
                             info['id'] = pid
@@ -350,6 +357,11 @@ def scrape_posts():
                             continue
                         seen.add(pid)
                         info = extract_post(c)
+                        # Apply keyword filtering if enabled
+                        if FILTER_TERMS:
+                            txt_l = (info.get('text') or '').lower()
+                            if not any(ft in txt_l for ft in FILTER_TERMS):
+                                continue
                         info['id'] = pid
                         info['index'] = collected
                         info['captured_at'] = datetime.utcnow().isoformat()
