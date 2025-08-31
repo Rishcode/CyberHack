@@ -1,4 +1,4 @@
-from detection_model import detect_hate_or_anti_india
+from detection_model import detect_content
 import os, time, json, hashlib, random, urllib.parse, sys
 from datetime import datetime
 from selenium import webdriver
@@ -20,9 +20,13 @@ HEADLESS = os.environ.get("HEADLESS", "").lower() in {"1","true","yes"}
 ATTACH = os.environ.get("ATTACH_EXISTING", "").lower() in {"1","true","yes"}
 INCLUDE_SHORTS = os.environ.get("YT_INCLUDE_SHORTS", "0").lower() in {"1","true","yes"}
 STOP_EMPTY_SCROLLS = int(os.environ.get("YT_STOP_EMPTY_SCROLLS", "12"))
+TAG_FILTERS = [t.strip().lower() for t in os.environ.get("TAG_FILTERS", "").split(',') if t.strip()]
+FLAGGED_DIR = os.environ.get("FLAGGED_DIR", os.path.join(OUT_DIR, "flagged"))
+FLAGGED_META_PATH = os.path.join(FLAGGED_DIR, "flagged_metadata.jsonl")
 
 os.makedirs(OUT_DIR, exist_ok=True)
 META_PATH = os.path.join(OUT_DIR, "metadata.jsonl")
+os.makedirs(FLAGGED_DIR, exist_ok=True)
 
 # ================= Console Encoding Safety (Windows) =================
 # Prevent UnicodeEncodeError when printing emoji or non cp1252 chars.
@@ -149,6 +153,12 @@ def extract_video(renderer):
         data['thumb_alt'] = ''
     return data
 
+def tagged_match(text: str) -> bool:
+    if not TAG_FILTERS:
+        return True  # no filtering configured
+    low = (text or '').lower()
+    return any(tag in low or f"#{tag}" in low for tag in TAG_FILTERS)
+
 def save_screenshot(driver, renderer, term_slug, idx, vid):
     fname = os.path.join(OUT_DIR, f"yt_{term_slug}_{idx:03d}_{vid[:8]}.png")
     try:
@@ -169,7 +179,7 @@ def scrape():
     driver = build_driver()
     try:
         wait = WebDriverWait(driver, 25)
-        with open(META_PATH, 'a', encoding='utf-8') as meta_file:
+        with open(META_PATH, 'a', encoding='utf-8') as meta_file, open(FLAGGED_META_PATH, 'a', encoding='utf-8') as flagged_meta:
             for term in SEARCH_TERMS:
                 encoded = urllib.parse.quote(term)
                 search_url = f"https://www.youtube.com/results?search_query={encoded}"
@@ -215,19 +225,45 @@ def scrape():
                             'captured_at': datetime.utcnow().isoformat(),
                             **data
                         }
-                        flag, reason = detect_hate_or_anti_india(data.get('title',''))
-                        hate_only = os.environ.get('HATE_ONLY', '0').lower() in {'1','true','yes'}
+                        only_flagged = os.environ.get('ONLY_FLAGGED', os.environ.get('HATE_ONLY','0')).lower() in {'1','true','yes'}
+                        # Tag filter first
+                        if not tagged_match(data.get('title','')):
+                            if only_flagged:
+                                try: os.remove(shot)
+                                except Exception: pass
+                            collected += 1
+                            new_in_cycle += 1
+                            continue
+                        flag, reason, score = detect_content(data.get('title',''), image_path=shot)
                         if flag:
                             record['flag_reason'] = reason
-                            meta_file.write(json.dumps(record, ensure_ascii=False) + '\n')
-                            meta_file.flush()
+                            record['flag_score'] = score
+                            # Write to flagged metadata file
+                            flagged_meta.write(json.dumps(record, ensure_ascii=False) + '\n')
+                            flagged_meta.flush()
+                            # Move/copy screenshot into flagged dir if not already there
+                            try:
+                                import shutil, os as _os
+                                base_name = os.path.basename(shot)
+                                flagged_path = os.path.join(FLAGGED_DIR, base_name)
+                                if os.path.abspath(os.path.dirname(shot)) != os.path.abspath(FLAGGED_DIR):
+                                    if only_flagged:
+                                        shutil.move(shot, flagged_path)
+                                        record['screenshot'] = flagged_path
+                                    else:
+                                        shutil.copy2(shot, flagged_path)
+                            except Exception:
+                                pass
                             safe_print(f"[FLAGGED] {reason} {data['title'][:60]} -> {shot}")
-                        elif not hate_only:
-                            meta_file.write(json.dumps(record, ensure_ascii=False) + '\n')
-                            meta_file.flush()
-                            safe_print(f"[VIDEO:{term}] {collected+1}/{PER_TERM} {data['title'][:60]} -> {shot}")
                         else:
-                            safe_print(f"[SKIP CLEAN] {data['title'][:60]} -> {shot}")
+                            if only_flagged:
+                                try: os.remove(shot)
+                                except Exception: pass
+                                safe_print(f"[SKIP CLEAN] {data['title'][:60]}")
+                            else:
+                                meta_file.write(json.dumps(record, ensure_ascii=False) + '\n')
+                                meta_file.flush()
+                                safe_print(f"[VIDEO:{term}] {collected+1}/{PER_TERM} {data['title'][:60]} -> {shot}")
                         collected += 1
                         new_in_cycle += 1
                         if collected >= PER_TERM:

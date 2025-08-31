@@ -1,410 +1,435 @@
-from detection_model import detect_hate_or_anti_india
-import os, time, json, hashlib, random
+"""Twitter / X scraper with hate detection and Explore-based search.
+
+Modes:
+  TIMELINE  - Scroll home timeline
+  TRENDING  - Capture trending topics
+  SEARCH    - Open Explore, type each search term, press Enter, scrape results
+
+Environment variables:
+  TWITTER_USERNAME / TWITTER_PASSWORD  - credentials (unless attaching existing session)
+  TW_MODE=TIMELINE|TRENDING|SEARCH
+  TW_SEARCH_TERMS="term1,term2" (for SEARCH)
+  TW_POST_TARGET=30  total posts per mode (per term for SEARCH)
+  ONLY_FLAGGED=1 (store only flagged screenshots) or HATE_ONLY
+  TAG_FILTERS="india,hate" (pre-detection tag filter)
+  DEBUG_DETECT=1 enables verbose detection_model prints
+  USE_GEMINI=1 enables Gemini fallback (requires GEMINI_API_KEY)
+"""
+
+from __future__ import annotations
+import os, sys, time, json, random, hashlib
 from datetime import datetime
+from typing import Dict, Any
+from detection_model import detect_content
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
 
 # === Config ===
 OUT_DIR = os.environ.get("TW_OUT_DIR", "twitter_posts")
 TARGET_COUNT = int(os.environ.get("TW_POST_TARGET", "30"))
-SCROLL_PAUSE = float(os.environ.get("TW_SCROLL_PAUSE", "1.6"))  # base pause
-JITTER_MIN = float(os.environ.get("TW_JITTER_MIN", "2"))  # requested 2-4 second delay range
-JITTER_MAX = float(os.environ.get("TW_JITTER_MAX", "4"))
+SCROLL_PAUSE = float(os.environ.get("TW_SCROLL_PAUSE", "1.4"))
+JITTER_MIN = float(os.environ.get("TW_JITTER_MIN", "1.8"))
+JITTER_MAX = float(os.environ.get("TW_JITTER_MAX", "3.8"))
 HEADLESS = os.environ.get("HEADLESS", "").lower() in {"1","true","yes"}
 ATTACH = os.environ.get("ATTACH_EXISTING", "").lower() in {"1","true","yes"}
 ENV_USER = "TWITTER_USERNAME"
 ENV_PASS = "TWITTER_PASSWORD"
-BASE_URL = "https://x.com/"  # formerly twitter.com
 TIMELINE_URL = os.environ.get("TW_TIMELINE_URL", "https://x.com/home")
 TRENDING_URL = os.environ.get("TW_TRENDING_URL", "https://x.com/explore/tabs/trending")
-MODE = os.environ.get("TW_MODE", "TIMELINE").upper()  # TIMELINE | TRENDING | SEARCH
+EXPLORE_URL = "https://x.com/explore"
+MODE = os.environ.get("TW_MODE", "TIMELINE").upper()
 SEARCH_TERMS = [t.strip() for t in os.environ.get("TW_SEARCH_TERMS", "").split(',') if t.strip()]
 FILTER_TERMS_ENV = os.environ.get("TW_FILTER_TERMS", "").strip()
 FILTER_TERMS = [t.lower().strip() for t in FILTER_TERMS_ENV.split(',') if t.strip()]
 INTERACTIVE = os.environ.get("TW_INTERACTIVE", "1").lower() in {"1","true","yes"}
+TAG_FILTERS = [t.strip().lower() for t in os.environ.get("TAG_FILTERS", "").split(',') if t.strip()]
+FLAGGED_DIR = os.environ.get("FLAGGED_DIR", os.path.join(OUT_DIR, "flagged"))
+FLAGGED_META_PATH = os.environ.get("FLAGGED_META_PATH", os.path.join(FLAGGED_DIR, "flagged_metadata.jsonl"))
+SEARCH_SCROLL_LIMIT = int(os.environ.get("TW_SEARCH_SCROLL_LIMIT", "45"))
+SEARCH_VIA = os.environ.get("TW_SEARCH_VIA", "AUTO").upper()  # EXPLORE | DIRECT | AUTO
 
 os.makedirs(OUT_DIR, exist_ok=True)
-meta_path = os.path.join(OUT_DIR, "metadata.jsonl")
+os.makedirs(FLAGGED_DIR, exist_ok=True)
+META_PATH = os.path.join(OUT_DIR, "metadata.jsonl")
 
-# === Driver Setup ===
-from selenium.webdriver.chrome.options import Options
+def _env(name: str) -> str:
+    v = os.environ.get(name, '').strip()
+    if not v:
+        raise RuntimeError(f"Missing env {name}")
+    return v
+
+def interactive_setup():
+    global MODE, SEARCH_TERMS, TAG_FILTERS, TARGET_COUNT
+    if not INTERACTIVE or not sys.stdin.isatty():
+        return
+    try:
+        mi = input(f"Mode [{MODE}] (TIMELINE/TRENDING/SEARCH): ").strip().upper()
+        if mi in {"TIMELINE","TRENDING","SEARCH"}:
+            MODE = mi
+        if MODE == "SEARCH" and not SEARCH_TERMS:
+            st = input("Search terms (comma separated): ").strip()
+            if st:
+                SEARCH_TERMS[:] = [t.strip() for t in st.split(',') if t.strip()]
+        if not TAG_FILTERS:
+            tg = input("Tag filters (comma, blank none): ").strip().lower()
+            if tg:
+                TAG_FILTERS[:] = [t.strip() for t in tg.split(',') if t.strip()]
+        tc = input(f"Target count [{TARGET_COUNT}]: ").strip()
+        if tc.isdigit():
+            TARGET_COUNT = int(tc)
+    except (EOFError, KeyboardInterrupt):
+        pass
 
 def build_driver():
     options = Options()
     if ATTACH:
         options.debugger_address = os.environ.get("DEBUG_ADDRESS", "127.0.0.1:9222")
     else:
-        # Mirror insta_final pattern: dedicated automation directory (not your live profile)
-        automation_dir = os.environ.get(
-            "CHROME_AUTOMATION_DIR",
-            os.path.join(os.getcwd(), "chrome_automation_profile")
-        )
+        automation_dir = os.environ.get("CHROME_AUTOMATION_DIR", os.path.join(os.getcwd(), "chrome_automation_profile"))
         os.makedirs(automation_dir, exist_ok=True)
         options.add_argument(f"--user-data-dir={automation_dir}")
-        profile_dir = os.environ.get("CHROME_PROFILE_DIR", "Default")
-        options.add_argument(f"--profile-directory={profile_dir}")
+        options.add_argument("--profile-directory=Default")
         options.add_argument("--disable-blink-features=AutomationControlled")
         if HEADLESS:
             options.add_argument("--headless=new")
-        # Keep logs quieter
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=options)
-    try:
-        driver.maximize_window()
-    except Exception:
-        pass
+    try: driver.maximize_window()
+    except Exception: pass
     return driver
-
-# === Helpers ===
-
-def _env(name:str)->str:
-    v = os.environ.get(name, '').strip()
-    if not v:
-        raise RuntimeError(f"Missing environment variable {name}")
-    return v
 
 def login(driver):
     if ATTACH:
-        # Assume already logged in when attaching
         return
     driver.get("https://x.com/login")
     time.sleep(random.uniform(JITTER_MIN, JITTER_MAX))
-    wait = WebDriverWait(driver, 10)
-    # Step 1: Username / email / phone
+    wait = WebDriverWait(driver, 15)
     try:
-        user_in = wait.until(EC.visibility_of_element_located((By.NAME, "text")))
-        user_in.clear()
-        user_in.send_keys(_env(ENV_USER))
-        time.sleep(random.uniform(0.25, 0.6))
-        # Prefer pressing Enter instead of .submit() (field often not inside <form>)
-        user_in.send_keys(Keys.ENTER)
+        u = wait.until(EC.visibility_of_element_located((By.NAME, "text")))
+        u.clear(); u.send_keys(_env(ENV_USER)); time.sleep(random.uniform(0.3,0.7)); u.send_keys(Keys.ENTER)
     except TimeoutException:
-        print("[WARN] Username field not found; maybe already logged in.")
-    except WebDriverException as e:
-        print(f"[WARN] Could not type username: {e}")
-
-    # Some flows require clicking a Next button after username
+        print("[LOGIN] Username field not found (maybe already logged in)")
     time.sleep(random.uniform(JITTER_MIN, JITTER_MAX))
+    # Password
     try:
-        next_btn_candidates = driver.find_elements(By.XPATH, "//span[text()='Next' or text()='Next ']/ancestor::div[@role='button']")
-        if next_btn_candidates:
-            next_btn_candidates[0].click()
-            time.sleep(1)
-    except WebDriverException:
-        pass
-
-    # Step 2: Possible extra identifier challenge (e.g., phone/email confirm)
-    try:
-        if not driver.find_elements(By.NAME, "password"):
-            challenge_input = driver.find_elements(By.NAME, "text")
-            if challenge_input and (challenge_input[0].get_attribute('value') == '' or challenge_input[0].get_attribute('value') == _env(ENV_USER)):
-                # Re-enter same identifier then Enter
-                challenge_input[0].clear()
-                challenge_input[0].send_keys(_env(ENV_USER))
-                time.sleep(random.uniform(0.3, 0.7))
-                challenge_input[0].send_keys(Keys.ENTER)
-                time.sleep(random.uniform(JITTER_MIN, JITTER_MAX))
-    except WebDriverException:
-        pass
-
-    # Step 3: Password
-    try:
-        pwd_in = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "password")))
-        pwd_in.clear()
-        pwd_in.send_keys(_env(ENV_PASS))
-        time.sleep(random.uniform(0.25, 0.6))
-        # Try clicking Log in button if present; else Enter
-        login_btns = driver.find_elements(By.XPATH, "//span[text()='Log in' or text()='Log In']/ancestor::div[@role='button']")
-        if login_btns:
-            login_btns[0].click()
-            time.sleep(random.uniform(JITTER_MIN, JITTER_MAX))
-        else:
-            pwd_in.send_keys(Keys.ENTER)
-            time.sleep(random.uniform(JITTER_MIN, JITTER_MAX))
+        p = wait.until(EC.visibility_of_element_located((By.NAME, "password")))
+        p.clear(); p.send_keys(_env(ENV_PASS)); time.sleep(random.uniform(0.3,0.6)); p.send_keys(Keys.ENTER)
     except TimeoutException:
-        print("[WARN] Password field not found; continuing.")
-    except WebDriverException as e:
-        print(f"[WARN] Could not enter password: {e}")
+        print("[LOGIN] Password field not found")
     # Wait for primary column
     try:
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
-        print("[INFO] Login success (primary column detected).")
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
+        print("[LOGIN] Success")
     except TimeoutException:
-        print("[WARN] Could not confirm login.")
-
+        print("[LOGIN] Primary column not confirmed")
 
 def post_identity(card):
     try:
-        # try data-testid= tweet element with stable attributes
-        tid = card.get_attribute('data-testid')
-        outer = card.get_attribute('outerHTML')
-        h = hashlib.sha1((tid or '')[:32].encode()+ outer[:400].encode()).hexdigest()
-        return h
+        tid = card.get_attribute('data-testid') or ''
+        outer = card.get_attribute('outerHTML') or ''
+        return hashlib.sha1((tid[:40] + outer[:400]).encode()).hexdigest()
     except WebDriverException:
         return str(id(card))
 
-
-def extract_post(card):
-    data = {}
+def extract_post(card) -> Dict[str, Any]:
+    data: Dict[str, Any] = {}
+    # text
     try:
-        # Username / handle
-        handle_el = card.find_element(By.CSS_SELECTOR, "a[href*='/status/']").find_element(By.XPATH, "./ancestor::article")
-    except Exception:
-        pass
-    try:
-        user = card.find_element(By.XPATH, ".//div[@data-testid='User-Name']//span").text
-        data['user'] = user
-    except Exception:
-        data['user'] = ''
-    # Content text
-    try:
-        text_parts = card.find_elements(By.XPATH, ".//div[@data-testid='tweetText']//span")
-        data['text'] = " ".join([t.text for t in text_parts]).strip()
+        parts = card.find_elements(By.XPATH, ".//div[@data-testid='tweetText']//span")
+        data['text'] = " ".join(p.text for p in parts).strip()
     except Exception:
         data['text'] = ''
-    # Timestamp
+    # user
     try:
-        ts = card.find_element(By.XPATH, ".//time").get_attribute("datetime")
-        data['timestamp'] = ts
+        data['user'] = card.find_element(By.XPATH, ".//div[@data-testid='User-Name']//span").text
+    except Exception:
+        data['user'] = ''
+    # time
+    try:
+        data['timestamp'] = card.find_element(By.XPATH, ".//time").get_attribute("datetime")
     except Exception:
         data['timestamp'] = ''
     return data
 
-
 def save_post_screenshot(driver, card, idx, pid):
-    fname = os.path.join(OUT_DIR, f"post_{idx:03d}_{pid[:8]}.png")
+    path = os.path.join(OUT_DIR, f"post_{idx:03d}_{pid[:8]}.png")
     try:
         driver.execute_script("arguments[0].scrollIntoView({block:'center'});", card)
-        time.sleep(random.uniform(0.5, 1.1))
-        card.screenshot(fname)
+        time.sleep(random.uniform(0.3,0.8))
+        card.screenshot(path)
     except Exception:
-        driver.save_screenshot(fname)
-    return fname
+        driver.save_screenshot(path)
+    return path
 
+def tagged_match(text: str) -> bool:
+    if not TAG_FILTERS:
+        return True
+    low = (text or '').lower()
+    return any(tag in low or f"#{tag}" in low for tag in TAG_FILTERS)
+
+def jitter_sleep():
+    time.sleep(SCROLL_PAUSE + random.uniform(JITTER_MIN, JITTER_MAX))
+
+def save_tweet(meta: Dict[str, Any], shot_path: str | None, flagged: bool):
+    only_flagged = os.environ.get('ONLY_FLAGGED', os.environ.get('HATE_ONLY','0')).lower() in {'1','true','yes'}
+    # Ensure screenshot in flagged dir if flagged
+    if flagged:
+        meta_file_path = FLAGGED_META_PATH
+    else:
+        meta_file_path = META_PATH
+    if flagged or not only_flagged:
+        if shot_path and flagged:
+            try:
+                import shutil
+                base = os.path.basename(shot_path)
+                target = os.path.join(FLAGGED_DIR, base)
+                if os.path.abspath(os.path.dirname(shot_path)) != os.path.abspath(FLAGGED_DIR):
+                    if only_flagged:
+                        shutil.move(shot_path, target)
+                        meta['screenshot'] = target
+                    else:
+                        shutil.copy2(shot_path, target)
+            except Exception:
+                pass
+        with open(meta_file_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(meta, ensure_ascii=False) + "\n")
+        return True
+    else:
+        # not flagged & only_flagged -> delete shot
+        if shot_path and os.path.exists(shot_path):
+            try: os.remove(shot_path)
+            except Exception: pass
+        return False
+
+def _direct_search_url(term: str) -> str:
+    from urllib.parse import quote
+    enc = quote(term)
+    # live (latest) results; change &f=live to remove for Top
+    return f"https://x.com/search?q={enc}&src=typed_query&f=live"
+
+def open_explore_and_search(driver, wait, term: str) -> bool:
+    """Attempt Explore-based interactive search; fallback to direct URL if needed.
+    Honors SEARCH_VIA (EXPLORE|DIRECT|AUTO).
+    """
+    strategy = SEARCH_VIA
+    if strategy not in {"EXPLORE","DIRECT","AUTO"}:
+        strategy = "AUTO"
+
+    def try_explore() -> bool:
+        driver.get(EXPLORE_URL)
+        # Multiple selector attempts
+        selectors = [
+            'input[data-testid="SearchBox_Search_Input"]',
+            'div[role="search"] input',
+            'input[placeholder*="Search"]',
+        ]
+        box = None
+        end_time = time.time() + 12
+        while time.time() < end_time and box is None:
+            for sel in selectors:
+                try:
+                    box = driver.find_element(By.CSS_SELECTOR, sel)
+                    if box:
+                        break
+                except Exception:
+                    continue
+            if not box:
+                time.sleep(0.6)
+        if not box:
+            print(f"[SEARCH][EXPLORE] Could not find search input for term '{term}' (URL now {driver.current_url})")
+            return False
+        try:
+            box.click(); box.clear(); box.send_keys(term); box.send_keys(Keys.ENTER)
+        except Exception as e:
+            print(f"[SEARCH][EXPLORE] Typing failed: {e}")
+            return False
+        # Wait for tweets OR fallback quick
+        try:
+            WebDriverWait(driver, 12).until(EC.presence_of_element_located((By.CSS_SELECTOR,'article[data-testid="tweet"]')))
+            print(f"[SEARCH][EXPLORE] Results loaded for '{term}'")
+            return True
+        except TimeoutException:
+            print(f"[SEARCH][EXPLORE] No tweet articles detected for '{term}' (current URL {driver.current_url})")
+            return False
+
+    def do_direct() -> bool:
+        url = _direct_search_url(term)
+        driver.get(url)
+        try:
+            WebDriverWait(driver, 12).until(EC.presence_of_element_located((By.CSS_SELECTOR,'article[data-testid="tweet"]')))
+            print(f"[SEARCH][DIRECT] Loaded results for '{term}'")
+            return True
+        except TimeoutException:
+            print(f"[SEARCH][DIRECT] No results visible for '{term}' (URL {driver.current_url})")
+            return False
+
+    if strategy == "DIRECT":
+        return do_direct()
+    if strategy == "EXPLORE":
+        return try_explore()
+    # AUTO
+    if try_explore():
+        return True
+    print("[SEARCH] Falling back to direct URL...")
+    return do_direct()
+
+def collect_search_results(driver, term: str, target: int):
+    seen = set(); collected = 0; empty = 0
+    only_flagged = os.environ.get('ONLY_FLAGGED', os.environ.get('HATE_ONLY','0')).lower() in {'1','true','yes'}
+    while collected < target and empty < SEARCH_SCROLL_LIMIT:
+        cards = driver.find_elements(By.CSS_SELECTOR, 'article[data-testid="tweet"]')
+        new_round = 0
+        for c in cards:
+            pid = post_identity(c)
+            if pid in seen: continue
+            seen.add(pid)
+            meta = extract_post(c)
+            txt = meta.get('text','')
+            # Search term presence heuristic
+            if term.lower().lstrip('#') not in txt.lower():
+                continue
+            if FILTER_TERMS and not any(ft in txt.lower() for ft in FILTER_TERMS):
+                continue
+            if not tagged_match(txt):
+                continue
+            meta.update({
+                'id': pid,
+                'mode': 'SEARCH',
+                'search_term': term,
+                'index': collected,
+                'captured_at': datetime.utcnow().isoformat()
+            })
+            shot = save_post_screenshot(driver, c, collected, pid)
+            meta['screenshot'] = shot
+            flag, reason, score = detect_content(txt, image_path=shot)
+            if flag:
+                meta['flag_reason'] = reason; meta['flag_score'] = score
+            stored = save_tweet(meta, shot, flagged=flag)
+            if stored:
+                collected += 1; new_round += 1
+                print(f"[SEARCH:{term}] {collected}/{target} {'FLAG' if flag else 'OK'} {reason if flag else ''}")
+            if collected >= target: break
+        if new_round == 0:
+            empty += 1
+        else:
+            empty = 0
+        if collected >= target: break
+        driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
+        jitter_sleep()
+    print(f"[SEARCH:{term}] Done collected={collected} empty_scrolls={empty}")
+    return collected
+
+def run_search_mode(driver):
+    if not SEARCH_TERMS:
+        print("[SEARCH] No terms provided (TW_SEARCH_TERMS)")
+        return
+    wait = WebDriverWait(driver, 20)
+    total = 0
+    for term in SEARCH_TERMS:
+        if not open_explore_and_search(driver, wait, term):
+            continue
+        total += collect_search_results(driver, term, TARGET_COUNT)
+    print(f"[SEARCH] Total collected across terms: {total}")
+
+def run_trending(driver):
+    driver.get(TRENDING_URL)
+    wait = WebDriverWait(driver, 20)
+    try:
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='trend']")))
+    except TimeoutException:
+        print("[TRENDING] No trend container found")
+        return
+    seen=set(); collected=0; rounds=0
+    while collected < TARGET_COUNT and rounds < 12:
+        cards = driver.find_elements(By.CSS_SELECTOR, "div[data-testid='trend']")
+        for card in cards:
+            try:
+                spans=[s.text.strip() for s in card.find_elements(By.CSS_SELECTOR,'span') if s.text.strip()]
+                if not spans: continue
+                topic=spans[0]
+                if topic in seen: continue
+                seen.add(topic)
+                pid = hashlib.sha1(topic.encode()).hexdigest()
+                shot = os.path.join(OUT_DIR, f"trend_{collected:03d}_{pid[:8]}.png")
+                try: card.screenshot(shot)
+                except Exception: driver.save_screenshot(shot)
+                info={
+                    'mode':'TRENDING','topic':topic,'id':pid,'index':collected,
+                    'screenshot':shot,'captured_at':datetime.utcnow().isoformat()
+                }
+                save_tweet(info, shot, flagged=False)
+                collected+=1
+                print(f"[TREND] {collected}/{TARGET_COUNT} {topic}")
+                if collected>=TARGET_COUNT: break
+            except Exception:
+                continue
+        if collected>=TARGET_COUNT: break
+        driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
+        jitter_sleep(); rounds+=1
+    print(f"[TRENDING] Collected {collected}")
+
+def run_timeline(driver):
+    driver.get(TIMELINE_URL)
+    try:
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
+    except TimeoutException:
+        print("[TIMELINE] Primary column not detected")
+    seen=set(); collected=0; stagnant=0; last_height=0
+    while collected < TARGET_COUNT and stagnant < 18:
+        cards = driver.find_elements(By.XPATH, "//article[@data-testid='tweet']")
+        new_round=0
+        for c in cards:
+            pid = post_identity(c)
+            if pid in seen: continue
+            seen.add(pid)
+            meta = extract_post(c)
+            txt = meta.get('text','')
+            if FILTER_TERMS and not any(ft in txt.lower() for ft in FILTER_TERMS):
+                continue
+            if not tagged_match(txt):
+                continue
+            meta.update({'id':pid,'mode':'TIMELINE','index':collected,'captured_at':datetime.utcnow().isoformat()})
+            shot = save_post_screenshot(driver, c, collected, pid)
+            meta['screenshot']=shot
+            flag, reason, score = detect_content(txt, image_path=shot)
+            if flag:
+                meta['flag_reason']=reason; meta['flag_score']=score
+            stored = save_tweet(meta, shot, flagged=flag)
+            if stored:
+                collected+=1; new_round+=1
+                print(f"[TIMELINE] {collected}/{TARGET_COUNT} {'FLAG' if flag else 'OK'} {reason if flag else ''}")
+            if collected>=TARGET_COUNT: break
+        if collected>=TARGET_COUNT: break
+        driver.find_element(By.TAG_NAME,'body').send_keys(Keys.END)
+        jitter_sleep()
+        new_height = driver.execute_script('return document.body.scrollHeight')
+        if new_round==0: stagnant+=1
+        else: stagnant=0
+        if new_height==last_height: stagnant+=1
+        last_height=new_height
+    print(f"[TIMELINE] Collected {collected}")
 
 def scrape_posts():
+    interactive_setup()
     driver = build_driver()
     try:
         login(driver)
-        if MODE == "TRENDING":
-            driver.get(TRENDING_URL)
-            wait = WebDriverWait(driver, 30)
-            try:
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='trend']")))
-            except TimeoutException:
-                print('[ERROR] No trending elements found.')
-                return
-            trends_seen = set()
-            collected = 0
-            with open(meta_path, 'a', encoding='utf-8') as meta_file:
-                scroll_rounds = 0
-                while collected < TARGET_COUNT and scroll_rounds < 10:
-                    trend_cards = driver.find_elements(By.CSS_SELECTOR, "div[data-testid='trend']")
-                    for card in trend_cards:
-                        try:
-                            label_spans = card.find_elements(By.CSS_SELECTOR, "span")
-                            texts = [s.text.strip() for s in label_spans if s.text.strip()]
-                            if not texts:
-                                continue
-                            topic = texts[0]
-                            if topic in trends_seen:
-                                continue
-                            trends_seen.add(topic)
-                            # Optional count heuristics
-                            count = ''
-                            for t in texts[1:]:
-                                if any(ch.isdigit() for ch in t) or 'posts' in t.lower() or 'tweets' in t.lower():
-                                    count = t
-                                    break
-                            pid = hashlib.sha1(topic.encode()).hexdigest()
-                            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", card)
-                            time.sleep(random.uniform(0.5, 1.0))
-                            shot_path = os.path.join(OUT_DIR, f"trend_{collected:03d}_{pid[:8]}.png")
-                            try:
-                                card.screenshot(shot_path)
-                            except Exception:
-                                driver.save_screenshot(shot_path)
-                            info = {
-                                'mode': 'TRENDING',
-                                'topic': topic,
-                                'count': count,
-                                'id': pid,
-                                'index': collected,
-                                'screenshot': shot_path,
-                                'captured_at': datetime.utcnow().isoformat()
-                            }
-                            meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
-                            meta_file.flush()
-                            print(f"[TREND] {collected+1}/{TARGET_COUNT} {topic} -> {shot_path}")
-                            collected += 1
-                            if collected >= TARGET_COUNT:
-                                break
-                        except Exception:
-                            continue
-                    if collected >= TARGET_COUNT:
-                        break
-                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
-                    time.sleep(SCROLL_PAUSE + random.uniform(JITTER_MIN, JITTER_MAX))
-                    scroll_rounds += 1
-                print(f"[DONE] Collected {collected} trending topics.")
-        elif MODE == "SEARCH":
-            if not SEARCH_TERMS:
-                print("[ERROR] SEARCH mode requires TW_SEARCH_TERMS env var (comma-separated keywords).")
-                return
-            wait = WebDriverWait(driver, 30)
-            with open(meta_path, 'a', encoding='utf-8') as meta_file:
-                for term in SEARCH_TERMS:
-                    from urllib.parse import quote
-                    encoded = quote(term)
-                    # Using 'live' filter for latest; remove &f=live for Top
-                    search_url = f"https://x.com/search?q={encoded}&src=typed_query&f=live"
-                    print(f"[TERM] Searching: {term} -> {search_url}")
-                    driver.get(search_url)
-                    try:
-                        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
-                    except TimeoutException:
-                        print(f"[WARN] Primary column not found for term {term}")
-                    collected = 0
-                    seen = set()
-                    stagnant = 0
-                    last_height = 0
-                    term_slug = ''.join(ch for ch in term if ch.isalnum() or ch in ('_','#')).strip('#') or 'term'
-                    target_per_term = TARGET_COUNT  # reuse global target; user can adjust env per run
-                    while collected < target_per_term and stagnant < 12:
-                        cards = driver.find_elements(By.XPATH, "//article[@data-testid='tweet']")
-                        new_in_cycle = 0
-                        for c in cards:
-                            pid = post_identity(c)
-                            if pid in seen:
-                                continue
-                            # crude filter: ensure term (case-insensitive) appears in text (or hashtag form) before saving
-                            text_lower = ''
-                            try:
-                                text_parts = c.find_elements(By.XPATH, ".//div[@data-testid='tweetText']//span")
-                                text_lower = ' '.join(t.text for t in text_parts).lower()
-                            except Exception:
-                                pass
-                            search_variants = {term.lower()}
-                            if term.startswith('#'):
-                                search_variants.add(term.lower().lstrip('#'))
-                            if not any(v in text_lower for v in search_variants):
-                                # skip if term not present; remove this block to capture all results page tweets
-                                continue
-                            # Optional filtering by FILTER_TERMS list (AND logic on presence of any term)
-                            if FILTER_TERMS:
-                                if not any(ft in text_lower for ft in FILTER_TERMS):
-                                    continue
-                            seen.add(pid)
-                            info = extract_post(c)
-                            info['id'] = pid
-                            info['index'] = collected
-                            info['search_term'] = term
-                            info['mode'] = 'SEARCH'
-                            info['captured_at'] = datetime.utcnow().isoformat()
-                            shot_path = os.path.join(OUT_DIR, f"search_{term_slug}_{collected:03d}_{pid[:8]}.png")
-                            try:
-                                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", c)
-                                time.sleep(random.uniform(0.4, 0.9))
-                                c.screenshot(shot_path)
-                            except Exception:
-                                driver.save_screenshot(shot_path)
-                            info['screenshot'] = shot_path
-                            meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
-                            meta_file.flush()
-                            collected += 1
-                            new_in_cycle += 1
-                            print(f"[SEARCH:{term}] {collected}/{target_per_term} -> {shot_path}")
-                            if collected >= target_per_term:
-                                break
-                        if collected >= target_per_term:
-                            break
-                        driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
-                        time.sleep(SCROLL_PAUSE + random.uniform(JITTER_MIN, JITTER_MAX))
-                        new_height = driver.execute_script('return document.body.scrollHeight')
-                        if new_in_cycle == 0:
-                            stagnant += 1
-                        else:
-                            stagnant = 0
-                        if new_height == last_height:
-                            stagnant += 1
-                        last_height = new_height
-                    print(f"[DONE] Term '{term}' collected {collected} tweets.")
+        if MODE == 'SEARCH':
+            run_search_mode(driver)
+        elif MODE == 'TRENDING':
+            run_trending(driver)
         else:
-            # TIMELINE mode (default)
-            driver.get(TIMELINE_URL)
-            wait = WebDriverWait(driver, 30)
-            try:
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='primaryColumn']")))
-            except TimeoutException:
-                print('[WARN] Timeline primary column not detected.')
-
-            collected = 0
-            seen = set()
-            with open(meta_path, 'a', encoding='utf-8') as meta_file:
-                last_height = 0
-                stagnant = 0
-                while collected < TARGET_COUNT and stagnant < 15:
-                    cards = driver.find_elements(By.XPATH, "//article[@data-testid='tweet']")
-                    new_in_cycle = 0
-                    for c in cards:
-                        pid = post_identity(c)
-                        if pid in seen:
-                            continue
-                        seen.add(pid)
-                        info = extract_post(c)
-                        # Apply keyword filtering if enabled
-                        if FILTER_TERMS:
-                            txt_l = (info.get('text') or '').lower()
-                            if not any(ft in txt_l for ft in FILTER_TERMS):
-                                continue
-                        info['id'] = pid
-                        info['index'] = collected
-                        info['captured_at'] = datetime.utcnow().isoformat()
-                        shot = save_post_screenshot(driver, c, collected, pid)
-                        info['screenshot'] = shot
-                        flag, reason = detect_hate_or_anti_india(info.get('text',''))
-                        hate_only = os.environ.get('HATE_ONLY', '0').lower() in {'1','true','yes'}
-                        if flag:
-                            info['flag_reason'] = reason
-                            meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
-                            meta_file.flush()
-                            print(f"[FLAGGED] {reason} -> {shot}")
-                        elif not hate_only:
-                            meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
-                            meta_file.flush()
-                            print(f"[POST] {collected+1}/{TARGET_COUNT} saved -> {shot}")
-                        else:
-                            print(f"[SKIP CLEAN] {collected+1}/{TARGET_COUNT} -> {shot}")
-                        collected += 1
-                        new_in_cycle += 1
-                        if collected >= TARGET_COUNT:
-                            break
-                    if collected >= TARGET_COUNT:
-                        break
-                    # Scroll
-                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
-                    # Base pause + human jitter
-                    time.sleep(SCROLL_PAUSE + random.uniform(JITTER_MIN, JITTER_MAX))
-                    new_height = driver.execute_script('return document.body.scrollHeight')
-                    if new_in_cycle == 0:
-                        stagnant += 1
-                    else:
-                        stagnant = 0
-                    if new_height == last_height:
-                        stagnant += 1
-                    last_height = new_height
-                print(f"[DONE] Collected {collected} posts.")
+            run_timeline(driver)
     finally:
-        try:
-            driver.quit()
-        except Exception:
-            pass
+        try: driver.quit()
+        except Exception: pass
 
 if __name__ == '__main__':
     scrape_posts()
