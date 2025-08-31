@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-import time, os, sys, hashlib, json
+import time, os, sys, hashlib
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
@@ -172,14 +172,6 @@ if FILTER_TERMS:
     print(f"[INFO] Filtering reels containing any of: {FILTER_TERMS}")
 if HASHTAG:
     print(f"[INFO] Hashtag mode active: #{HASHTAG}")
-meta_path = os.environ.get("INSTA_META_FILE", os.path.join(out_dir, "metadata.jsonl"))
-
-def write_meta(rec: dict):
-    try:
-        with open(meta_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except Exception as e:
-        print(f"[WARN] Meta write failed: {e}")
 
 seen_ids = set()
 saved = 0
@@ -198,7 +190,7 @@ def reel_identity(video_el):
             src = str(id(video_el))
     return hashlib.sha1(src.encode("utf-8")).hexdigest()
 
-def center_and_capture(video_el, idx, context_txt=""):
+def center_and_capture(video_el, idx):
     driver.execute_script("""
         const el = arguments[0];
         el.scrollIntoView({behavior:'auto', block:'center', inline:'center'});
@@ -212,16 +204,6 @@ def center_and_capture(video_el, idx, context_txt=""):
     except Exception:
         driver.save_screenshot(fname)
     print(f"[CAPTURE] {fname}")
-    write_meta({
-        'type': 'REEL',
-        'index': idx,
-        'file': fname,
-        'reel_id': rid,
-        'hashtag': HASHTAG,
-        'filters': FILTER_TERMS,
-        'context_excerpt': (context_txt[:160] if context_txt else ''),
-        'captured_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    })
 
 def capture_hashtag_posts():
     hash_target = int(os.environ.get("INSTA_HASHTAG_TARGET", str(target)))
@@ -261,16 +243,6 @@ def capture_hashtag_posts():
                 except Exception:
                     driver.save_screenshot(fname)
                 print(f"[HASHPOST] {collected+1}/{hash_target} -> {fname}")
-                write_meta({
-                    'type': 'HASHTAG_POST',
-                    'index': collected,
-                    'file': fname,
-                    'post_id': pid,
-                    'url': href,
-                    'hashtag': HASHTAG,
-                    'filters': FILTER_TERMS,
-                    'captured_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-                })
                 collected += 1
                 new_in_cycle += 1
                 if collected >= hash_target:
@@ -314,16 +286,17 @@ while saved < target:
             if rid in seen_ids:
                 continue
             seen_ids.add(rid)
-            context_txt = ""
             if FILTER_TERMS:
+                context_txt = ""
                 try:
-                    parent = v.find_element(By.XPATH, "ancestor::div[1]")
-                    context_txt = (parent.text or '').lower()
-                    if context_txt and not any(ft in context_txt for ft in FILTER_TERMS):
-                        continue
+                    # Try parent containers for text/captions
+                    parent = v.find_element(By.XPATH, "ancestor::div[1]")  # keep minimal; adjust if needed
+                    context_txt = parent.text.lower()
                 except Exception:
-                    context_txt = ""
-            center_and_capture(v, saved, context_txt)
+                    pass
+                if context_txt and not any(ft in context_txt for ft in FILTER_TERMS):
+                    continue
+            center_and_capture(v, saved)
             saved += 1
             new_in_cycle += 1
             last_new_time = time.time()

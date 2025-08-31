@@ -1,4 +1,4 @@
-import os, time, json, hashlib, random, urllib.parse
+import os, time, json, hashlib, random, urllib.parse, sys
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -22,6 +22,33 @@ STOP_EMPTY_SCROLLS = int(os.environ.get("YT_STOP_EMPTY_SCROLLS", "12"))
 
 os.makedirs(OUT_DIR, exist_ok=True)
 META_PATH = os.path.join(OUT_DIR, "metadata.jsonl")
+
+# ================= Console Encoding Safety (Windows) =================
+# Prevent UnicodeEncodeError when printing emoji or non cp1252 chars.
+try:
+    # Reconfigure standard streams to UTF-8 with replacement fallback.
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[attr-defined]
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[attr-defined]
+except Exception:
+    pass
+
+def safe_print(*args, **kwargs):
+    """Print wrapper that avoids UnicodeEncodeError in legacy consoles.
+    Falls back to replacing unencodable characters.
+    """
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        enc = getattr(sys.stdout, 'encoding', 'utf-8') or 'utf-8'
+        new_args = []
+        for a in args:
+            if isinstance(a, str):
+                try:
+                    a.encode(enc)
+                except UnicodeEncodeError:
+                    a = a.encode(enc, 'replace').decode(enc, 'replace')
+            new_args.append(a)
+        print(*new_args, **kwargs)
 
 # ================= Driver =================
 
@@ -136,7 +163,7 @@ def save_screenshot(driver, renderer, term_slug, idx, vid):
 def scrape():
     prompt_search_terms()
     if not SEARCH_TERMS:
-        print("[ERROR] No search terms provided. Set YT_SEARCH_TERMS env var or input interactively.")
+        safe_print("[ERROR] No search terms provided. Set YT_SEARCH_TERMS env var or input interactively.")
         return
     driver = build_driver()
     try:
@@ -145,12 +172,12 @@ def scrape():
             for term in SEARCH_TERMS:
                 encoded = urllib.parse.quote(term)
                 search_url = f"https://www.youtube.com/results?search_query={encoded}"
-                print(f"[TERM] {term} -> {search_url}")
+                safe_print(f"[TERM] {term} -> {search_url}")
                 driver.get(search_url)
                 try:
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "ytd-video-renderer")))
                 except TimeoutException:
-                    print(f"[WARN] No video renderers visible for term {term}")
+                    safe_print(f"[WARN] No video renderers visible for term {term}")
                 collected = 0
                 seen_ids = set()
                 stagnant = 0
@@ -191,7 +218,7 @@ def scrape():
                         meta_file.flush()
                         collected += 1
                         new_in_cycle += 1
-                        print(f"[VIDEO:{term}] {collected}/{PER_TERM} {data['title'][:60]} -> {shot}")
+                        safe_print(f"[VIDEO:{term}] {collected}/{PER_TERM} {data['title'][:60]} -> {shot}")
                         if collected >= PER_TERM:
                             break
                     if collected >= PER_TERM:
@@ -207,7 +234,7 @@ def scrape():
                     if new_height == last_height:
                         stagnant += 1
                     last_height = new_height
-                print(f"[DONE] Term '{term}' collected {collected} videos.")
+                safe_print(f"[DONE] Term '{term}' collected {collected} videos.")
     finally:
         try:
             driver.quit()
