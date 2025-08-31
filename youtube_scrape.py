@@ -1,3 +1,4 @@
+from detection_model import detect_hate_or_anti_india
 import os, time, json, hashlib, random, urllib.parse, sys
 from datetime import datetime
 from selenium import webdriver
@@ -214,11 +215,21 @@ def scrape():
                             'captured_at': datetime.utcnow().isoformat(),
                             **data
                         }
-                        meta_file.write(json.dumps(record, ensure_ascii=False) + '\n')
-                        meta_file.flush()
+                        flag, reason = detect_hate_or_anti_india(data.get('title',''))
+                        hate_only = os.environ.get('HATE_ONLY', '0').lower() in {'1','true','yes'}
+                        if flag:
+                            record['flag_reason'] = reason
+                            meta_file.write(json.dumps(record, ensure_ascii=False) + '\n')
+                            meta_file.flush()
+                            safe_print(f"[FLAGGED] {reason} {data['title'][:60]} -> {shot}")
+                        elif not hate_only:
+                            meta_file.write(json.dumps(record, ensure_ascii=False) + '\n')
+                            meta_file.flush()
+                            safe_print(f"[VIDEO:{term}] {collected+1}/{PER_TERM} {data['title'][:60]} -> {shot}")
+                        else:
+                            safe_print(f"[SKIP CLEAN] {data['title'][:60]} -> {shot}")
                         collected += 1
                         new_in_cycle += 1
-                        safe_print(f"[VIDEO:{term}] {collected}/{PER_TERM} {data['title'][:60]} -> {shot}")
                         if collected >= PER_TERM:
                             break
                     if collected >= PER_TERM:

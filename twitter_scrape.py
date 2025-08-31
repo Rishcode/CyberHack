@@ -1,3 +1,4 @@
+from detection_model import detect_hate_or_anti_india
 import os, time, json, hashlib, random
 from datetime import datetime
 from selenium import webdriver
@@ -367,9 +368,19 @@ def scrape_posts():
                         info['captured_at'] = datetime.utcnow().isoformat()
                         shot = save_post_screenshot(driver, c, collected, pid)
                         info['screenshot'] = shot
-                        meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
-                        meta_file.flush()
-                        print(f"[POST] {collected+1}/{TARGET_COUNT} saved -> {shot}")
+                        flag, reason = detect_hate_or_anti_india(info.get('text',''))
+                        hate_only = os.environ.get('HATE_ONLY', '0').lower() in {'1','true','yes'}
+                        if flag:
+                            info['flag_reason'] = reason
+                            meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
+                            meta_file.flush()
+                            print(f"[FLAGGED] {reason} -> {shot}")
+                        elif not hate_only:
+                            meta_file.write(json.dumps(info, ensure_ascii=False) + "\n")
+                            meta_file.flush()
+                            print(f"[POST] {collected+1}/{TARGET_COUNT} saved -> {shot}")
+                        else:
+                            print(f"[SKIP CLEAN] {collected+1}/{TARGET_COUNT} -> {shot}")
                         collected += 1
                         new_in_cycle += 1
                         if collected >= TARGET_COUNT:
