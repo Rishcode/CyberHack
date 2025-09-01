@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-import time, os, sys, hashlib
+import time, os, sys, hashlib, json
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
@@ -167,6 +167,19 @@ if os.environ.get("CAPTURE", "1").lower() not in {"1","true","yes"}:
 target = int(os.environ.get("REEL_TARGET", "50"))
 out_dir = "reels_screenshots"
 os.makedirs(out_dir, exist_ok=True)
+FLAGGED_DIR = os.environ.get("INSTA_FLAGGED_DIR", os.path.join(out_dir, "flagged"))
+os.makedirs(FLAGGED_DIR, exist_ok=True)
+META_PATH = os.path.join(out_dir, "metadata.jsonl")
+FLAGGED_META_PATH = os.path.join(FLAGGED_DIR, "flagged_metadata.jsonl")
+
+USE_GEM_VISION = os.environ.get("USE_GEMINI_VISION", "1").lower() in {"1","true","yes"}
+ONLY_FLAGGED = os.environ.get('ONLY_FLAGGED', os.environ.get('HATE_ONLY','0')).lower() in {'1','true','yes'}
+GEM_FLAGS = {"deepfake","anti_india","dangerous","not_kid_safe"}
+_DEBUG_DETECT = os.environ.get("DEBUG_DETECT", "0").lower() in {"1","true","yes"}
+try:
+    from gemini_vision import classify_image as gemini_vision_classify  # type: ignore
+except Exception:
+    gemini_vision_classify = None  # type: ignore
 print(f"[INFO] Saving up to {target} reel screenshots in {out_dir}")
 if FILTER_TERMS:
     print(f"[INFO] Filtering reels containing any of: {FILTER_TERMS}")
@@ -204,6 +217,7 @@ def center_and_capture(video_el, idx):
     except Exception:
         driver.save_screenshot(fname)
     print(f"[CAPTURE] {fname}")
+    return fname
 
 def capture_hashtag_posts():
     hash_target = int(os.environ.get("INSTA_HASHTAG_TARGET", str(target)))
@@ -296,7 +310,63 @@ while saved < target:
                     pass
                 if context_txt and not any(ft in context_txt for ft in FILTER_TERMS):
                     continue
-            center_and_capture(v, saved)
+            shot_path = center_and_capture(v, saved)
+            # Optional Gemini Vision classification
+            flagged = False
+            gem_reason = ''
+            gem_result = None
+            if USE_GEM_VISION and gemini_vision_classify:
+                # Basic context attempt: parent text
+                context_txt = ''
+                try:
+                    parent = v.find_element(By.XPATH, "ancestor::div[1]")
+                    context_txt = parent.text[:800]
+                except Exception:
+                    pass
+                gem_result = gemini_vision_classify(shot_path, context_txt)
+                if gem_result:
+                    # Decide flag
+                    if any(gem_result.get(k) for k in GEM_FLAGS):
+                        flagged = True
+                        reasons = [k for k in GEM_FLAGS if gem_result.get(k)]
+                        gem_reason = "gemini_vision:" + ",".join(reasons) + (":" + gem_result.get('reason','') if gem_result.get('reason') else '')
+                        if _DEBUG_DETECT:
+                            print(f"[VISION_FLAG] {gem_reason}")
+                    elif _DEBUG_DETECT:
+                        print("[VISION_CLEAN]", gem_result)
+            meta = {
+                'id': rid,
+                'index': saved,
+                'screenshot': shot_path,
+                'captured_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                'context_terms': FILTER_TERMS,
+            }
+            if gem_result:
+                meta.update(gem_result)
+            if flagged:
+                meta['flag_reason'] = gem_reason
+                try:
+                    import shutil
+                    base = os.path.basename(shot_path)
+                    flagged_path = os.path.join(FLAGGED_DIR, base)
+                    if os.path.abspath(os.path.dirname(shot_path)) != os.path.abspath(FLAGGED_DIR):
+                        if ONLY_FLAGGED:
+                            shutil.move(shot_path, flagged_path)
+                            meta['screenshot'] = flagged_path
+                        else:
+                            shutil.copy2(shot_path, flagged_path)
+                except Exception:
+                    pass
+                with open(FLAGGED_META_PATH, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(meta, ensure_ascii=False) + "\n")
+                print(f"[FLAGGED] {gem_reason} -> {meta['screenshot']}")
+            else:
+                if ONLY_FLAGGED:
+                    try: os.remove(shot_path)
+                    except Exception: pass
+                else:
+                    with open(META_PATH, 'a', encoding='utf-8') as f:
+                        f.write(json.dumps(meta, ensure_ascii=False) + "\n")
             saved += 1
             new_in_cycle += 1
             last_new_time = time.time()
@@ -317,6 +387,7 @@ while saved < target:
     # Scroll down
     driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
     time.sleep(3.5)
+
 
     # If feed stuck >60s without new reel break
     if time.time() - last_new_time > 60:

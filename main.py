@@ -12,6 +12,7 @@ environment variables. Output is streamed into the GUI.
 Scripts expected in same directory:
   - insta_final.py
   - twitter_scrape.py
+  
   - youtube_scrape.py
 """
 
@@ -45,6 +46,23 @@ class ScrapeLauncher:
         ttk.Checkbutton(glob, text='Headless', variable=self.headless_var).pack(side='left', padx=4)
         ttk.Checkbutton(glob, text='Attach Existing Chrome', variable=self.attach_var).pack(side='left', padx=4)
 
+        # Detection / Filtering options
+        detect = ttk.LabelFrame(root, text='Detection / Filtering')
+        detect.pack(fill='x', padx=10, pady=6)
+        self.only_flagged_var = tk.BooleanVar(value=True)
+        self.debug_detect_var = tk.BooleanVar(value=False)
+        self.use_gemini_var = tk.BooleanVar(value=False)
+        self.use_gemini_vision_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(detect, text='Only Flagged', variable=self.only_flagged_var).pack(side='left', padx=4)
+        ttk.Checkbutton(detect, text='Debug Detect', variable=self.debug_detect_var).pack(side='left', padx=4)
+        ttk.Checkbutton(detect, text='Gemini Text', variable=self.use_gemini_var).pack(side='left', padx=4)
+        ttk.Checkbutton(detect, text='Gemini Vision', variable=self.use_gemini_vision_var).pack(side='left', padx=4)
+        tag_frame = ttk.Frame(detect)
+        tag_frame.pack(fill='x', pady=2)
+        ttk.Label(tag_frame, text='Tag Filters:', width=12).pack(side='left')
+        self.tag_filters_var = tk.StringVar()
+        ttk.Entry(tag_frame, textvariable=self.tag_filters_var, width=50).pack(side='left', fill='x', expand=True)
+
         # Credentials (optional)
         cred = ttk.LabelFrame(root, text='Credentials (optional)')
         cred.pack(fill='x', padx=10, pady=6)
@@ -72,6 +90,7 @@ class ScrapeLauncher:
         self.output.pack(fill='both', expand=True)
         self.output.configure(state='disabled')
 
+        # Finalize
         self._render_platform_opts()
         self.root.protocol('WM_DELETE_WINDOW', self.on_close)
         self._poll_queue()
@@ -98,6 +117,9 @@ class ScrapeLauncher:
             modes = ttk.Frame(self.platform_frame); modes.pack(fill='x', pady=2)
             ttk.Label(modes, text='Mode:').pack(side='left')
             ttk.Combobox(modes, textvariable=self.tw_mode, values=['TIMELINE','TRENDING','SEARCH'], width=12, state='readonly').pack(side='left', padx=4)
+            self.tw_search_via = tk.StringVar(value='AUTO')
+            ttk.Label(modes, text='Search Via:').pack(side='left')
+            ttk.Combobox(modes, textvariable=self.tw_search_via, values=['AUTO','EXPLORE','DIRECT'], width=10, state='readonly').pack(side='left', padx=4)
             self.tw_search = self._labeled_entry(self.platform_frame, 'Search Terms (,):', 40)
             self.tw_filter = self._labeled_entry(self.platform_frame, 'Filter Terms (,):', 40)
             self.tw_target = self._labeled_entry(self.platform_frame, 'Target Count:', 8)
@@ -143,13 +165,26 @@ class ScrapeLauncher:
 
         # Platform specific env
         if plat == 'Twitter':
-            env['TW_MODE'] = self.tw_mode.get().upper()
-            if self.tw_search.get().strip():
-                env['TW_SEARCH_TERMS'] = self.tw_search.get().strip()
+            requested_mode = self.tw_mode.get().upper()
+            search_terms_value = self.tw_search.get().strip()
+            # If user entered search terms but left mode not SEARCH, auto-upgrade to SEARCH.
+            if search_terms_value and requested_mode != 'SEARCH':
+                self.append_log('[INFO] Auto-switching Twitter mode to SEARCH due to search terms provided.\n')
+                requested_mode = 'SEARCH'
+            env['TW_MODE'] = requested_mode
+            if search_terms_value:
+                env['TW_SEARCH_TERMS'] = search_terms_value
             if self.tw_filter.get().strip():
                 env['TW_FILTER_TERMS'] = self.tw_filter.get().strip()
             if self.tw_target.get().isdigit():
                 env['TW_POST_TARGET'] = self.tw_target.get().strip()
+            env['TW_SEARCH_VIA'] = self.tw_search_via.get().upper()
+            # Quick diagnostic dump for Twitter
+            diag_keys = ['TW_MODE','TW_SEARCH_TERMS','TW_FILTER_TERMS','TW_POST_TARGET','TW_SEARCH_VIA','ONLY_FLAGGED','DEBUG_DETECT','USE_GEMINI','USE_GEMINI_VISION']
+            self.append_log('[ENV] Twitter launch vars:\n')
+            for k in diag_keys:
+                if k in env:
+                    self.append_log(f'  {k}={env[k]}\n')
         elif plat == 'Instagram':
             if self.ig_hashtag.get().strip():
                 env['INSTA_HASHTAG'] = self.ig_hashtag.get().strip().lstrip('#')
@@ -166,13 +201,24 @@ class ScrapeLauncher:
                 env['YT_PER_TERM'] = self.yt_per_term.get().strip()
             env['YT_INCLUDE_SHORTS'] = '1' if self.yt_include_shorts.get() else '0'
 
+        # Detection flags applied to all scripts
+        env['ONLY_FLAGGED'] = '1' if self.only_flagged_var.get() else '0'
+        env['DEBUG_DETECT'] = '1' if self.debug_detect_var.get() else '0'
+        env['USE_GEMINI'] = '1' if self.use_gemini_var.get() else '0'
+        env['USE_GEMINI_VISION'] = '1' if self.use_gemini_vision_var.get() else '0'
+        if self.tag_filters_var.get().strip():
+            env['TAG_FILTERS'] = self.tag_filters_var.get().strip()
+
         self.append_log(f"\n[LAUNCH] {plat} scraper starting...\n")
         try:
-            self.proc = subprocess.Popen([sys.executable, script], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
+            # Use unbuffered mode for immediate stdout visibility
+            self.proc = subprocess.Popen([sys.executable, '-u', script], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
         except Exception as e:
             self.append_log(f"[ERROR] Failed to start process: {e}\n")
             self.proc = None
             return
+
+        self.append_log('[INFO] Environment overrides applied.\n')
         self.run_btn.configure(state='disabled')
         self.stop_btn.configure(state='normal')
         threading.Thread(target=self._reader_thread, daemon=True).start()

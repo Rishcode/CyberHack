@@ -52,10 +52,29 @@ FLAGGED_DIR = os.environ.get("FLAGGED_DIR", os.path.join(OUT_DIR, "flagged"))
 FLAGGED_META_PATH = os.environ.get("FLAGGED_META_PATH", os.path.join(FLAGGED_DIR, "flagged_metadata.jsonl"))
 SEARCH_SCROLL_LIMIT = int(os.environ.get("TW_SEARCH_SCROLL_LIMIT", "45"))
 SEARCH_VIA = os.environ.get("TW_SEARCH_VIA", "AUTO").upper()  # EXPLORE | DIRECT | AUTO
+RELAX_AFTER_EMPTY = int(os.environ.get("TW_RELAX_AFTER_EMPTY", "6"))  # scroll rounds with no new before relaxing term match
+
+# Escalate to SEARCH if search terms provided but user MODE not SEARCH
+if SEARCH_TERMS and MODE != "SEARCH":
+    print(f"[CONFIG] Forcing MODE=SEARCH because search terms supplied: {SEARCH_TERMS}")
+    MODE = "SEARCH"
 
 os.makedirs(OUT_DIR, exist_ok=True)
 os.makedirs(FLAGGED_DIR, exist_ok=True)
 META_PATH = os.path.join(OUT_DIR, "metadata.jsonl")
+
+def _print_config_summary():
+    try:
+        print("[CONFIG] MODE=", MODE,
+              "TARGET_COUNT=", TARGET_COUNT,
+              "SEARCH_TERMS=", SEARCH_TERMS,
+              "FILTER_TERMS=", FILTER_TERMS,
+              "TAG_FILTERS=", TAG_FILTERS,
+              "SEARCH_VIA=", SEARCH_VIA,
+              "HEADLESS=", HEADLESS,
+              "ATTACH=", ATTACH)
+    except Exception as e:
+        print(f"[CONFIG] Summary error: {e}")
 
 def _env(name: str) -> str:
     v = os.environ.get(name, '').strip()
@@ -229,6 +248,8 @@ def open_explore_and_search(driver, wait, term: str) -> bool:
             'input[data-testid="SearchBox_Search_Input"]',
             'div[role="search"] input',
             'input[placeholder*="Search"]',
+            'input[aria-label="Search query"]',
+            'form[role="search"] input',
         ]
         box = None
         end_time = time.time() + 12
@@ -247,6 +268,14 @@ def open_explore_and_search(driver, wait, term: str) -> bool:
             return False
         try:
             box.click(); box.clear(); box.send_keys(term); box.send_keys(Keys.ENTER)
+            # After initial enter, optionally refine URL to include src=recent_search_click
+            time.sleep(1.2)
+            from urllib.parse import quote
+            enc = quote(term)
+            # Preserve whether we want live or top: use f=live if current page didn't redirect automatically
+            suffix = '&f=live' if 'f=live' in driver.current_url or os.environ.get('TW_FORCE_LIVE','1') in {'1','true','yes'} else ''
+            target_url = f"https://x.com/search?q={enc}&src=recent_search_click{suffix}"
+            driver.get(target_url)
         except Exception as e:
             print(f"[SEARCH][EXPLORE] Typing failed: {e}")
             return False
@@ -270,6 +299,7 @@ def open_explore_and_search(driver, wait, term: str) -> bool:
             print(f"[SEARCH][DIRECT] No results visible for '{term}' (URL {driver.current_url})")
             return False
 
+    print(f"[SEARCH] Strategy={strategy} term='{term}'")
     if strategy == "DIRECT":
         return do_direct()
     if strategy == "EXPLORE":
@@ -281,7 +311,7 @@ def open_explore_and_search(driver, wait, term: str) -> bool:
     return do_direct()
 
 def collect_search_results(driver, term: str, target: int):
-    seen = set(); collected = 0; empty = 0
+    seen = set(); collected = 0; empty = 0; skipped_due_to_term = 0; relaxed = False
     only_flagged = os.environ.get('ONLY_FLAGGED', os.environ.get('HATE_ONLY','0')).lower() in {'1','true','yes'}
     while collected < target and empty < SEARCH_SCROLL_LIMIT:
         cards = driver.find_elements(By.CSS_SELECTOR, 'article[data-testid="tweet"]')
@@ -292,8 +322,10 @@ def collect_search_results(driver, term: str, target: int):
             seen.add(pid)
             meta = extract_post(c)
             txt = meta.get('text','')
-            # Search term presence heuristic
-            if term.lower().lstrip('#') not in txt.lower():
+            # Search term presence heuristic (relax after many empty scrolls)
+            base_term = term.lower().lstrip('#')
+            if not relaxed and base_term not in txt.lower():
+                skipped_due_to_term += 1
                 continue
             if FILTER_TERMS and not any(ft in txt.lower() for ft in FILTER_TERMS):
                 continue
@@ -318,6 +350,10 @@ def collect_search_results(driver, term: str, target: int):
             if collected >= target: break
         if new_round == 0:
             empty += 1
+            # Relax condition if too many empty scrolls without collecting
+            if not relaxed and empty >= RELAX_AFTER_EMPTY and collected == 0:
+                relaxed = True
+                print(f"[SEARCH:{term}] Relaxing term presence requirement after {empty} empty rounds (skipped {skipped_due_to_term} tweets)")
         else:
             empty = 0
         if collected >= target: break
@@ -333,7 +369,9 @@ def run_search_mode(driver):
     wait = WebDriverWait(driver, 20)
     total = 0
     for term in SEARCH_TERMS:
+        print(f"[SEARCH] Starting term '{term}' via {SEARCH_VIA}")
         if not open_explore_and_search(driver, wait, term):
+            print(f"[SEARCH] Navigation failed for '{term}', skipping")
             continue
         total += collect_search_results(driver, term, TARGET_COUNT)
     print(f"[SEARCH] Total collected across terms: {total}")
@@ -418,12 +456,19 @@ def run_timeline(driver):
 
 def scrape_posts():
     interactive_setup()
+    _print_config_summary()
     driver = build_driver()
     try:
         login(driver)
-        if MODE == 'SEARCH':
+        # Safety: if search terms exist but MODE not SEARCH (should have been forced earlier)
+        if SEARCH_TERMS and MODE != 'SEARCH':
+            print('[SEARCH] Detected search terms with non-SEARCH mode; switching to SEARCH')
+            mode = 'SEARCH'
+        else:
+            mode = MODE
+        if mode == 'SEARCH':
             run_search_mode(driver)
-        elif MODE == 'TRENDING':
+        elif mode == 'TRENDING':
             run_trending(driver)
         else:
             run_timeline(driver)

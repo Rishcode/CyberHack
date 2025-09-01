@@ -1,3 +1,6 @@
-2025/08/31-19:20:59.307 3084 Reusing MANIFEST C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\shared_proto_db/MANIFEST-000001
-2025/08/31-19:20:59.307 3084 Recovering log #4
-2025/08/31-19:20:59.310 3084 Reusing old log C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\shared_proto_db/000004.log 
+2025/09/01-18:23:22.326 65e0 Reusing MANIFEST C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\shared_proto_db/MANIFEST-000001
+2025/09/01-18:23:22.326 65e0 Recovering log #4
+2025/09/01-18:23:22.328 65e0 Reusing old log C:\Users\Asus\Desktop\CyberHack\chrome_automation_profile\Default\shared_proto_db/000004.log 
+2025/09/01-18:23:22.341 9864 Level-0 table #8: started
+2025/09/01-18:23:22.345 9864 Level-0 table #8: 107239 bytes OK
+2025/09/01-18:23:22.346 9864 Delete type=0 #4
